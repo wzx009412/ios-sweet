@@ -31,6 +31,9 @@ env:
   MACOS_VERSION: ${{ inputs.macos_version || '13.5' }}
   KERNEL_CONFIG: ${{ inputs.kernel_config || 'DEVELOPMENT' }}
   MACHINE_CONFIG: ${{ inputs.machine_config || 'SWEET' }}
+  CCACHE_COMPILERCHECK: content
+  CCACHE_MAXSIZE: 1500M
+  CCACHE_BASEDIR: ${{ github.workspace }}
 
 jobs:
   build:
@@ -67,11 +70,26 @@ jobs:
           xcodebuild -version
           xcrun --find iig
 
+      - name: Cache compiler output
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: xnu-${{ env.KERNEL_CONFIG }}-${{ env.MACHINE_CONFIG }}
+          max-size: 1500M
+
+      - name: Prepare ccache compiler wrapper
+        run: |
+          CLANG=$(xcrun --find clang)
+          echo "clang: $CLANG"
+          printf '#!/bin/sh\nif command -v ccache >/dev/null 2>&1; then exec ccache %s "$@"; fi\nexec %s "$@"\n' "$CLANG" "$CLANG" > /tmp/cc
+          chmod +x /tmp/cc
+          cat /tmp/cc
+          /tmp/cc --version | head -2
+
       - name: Build
         working-directory: dxb
         env:
           # keep going after errors so one run reports every compile failure
-          MAKEFLAGS: ${{ inputs.keep_going == 'false' && '' || '-k' }}
+          MAKEFLAGS: ${{ inputs.keep_going == 'false' && '' || '-k' }} CC=/tmp/cc
         run: bash build.sh
 
       - name: Package build tree for local compiles
