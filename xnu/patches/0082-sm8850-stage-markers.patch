@@ -1,66 +1,108 @@
 diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
 --- a/osfmk/arm64/start.s
 +++ b/osfmk/arm64/start.s
-@@ -464,22 +464,25 @@
+@@ -464,22 +464,21 @@
  	mov		x21, #0
  
  #if defined(SWEET)
 -	/* Stage 0: white 64x32 band, no stack or page tables needed. */
 -	MOV64	x0, (0xFC800000 + 2368 * 4320)
 -	mov		w1, #-1
-+/* Bring-up stage markers: one 48x32 block per stage at row 2368, 128 px
-+ * apart, distinct colour per stage (0 white, 1 red, 2 green, 3 blue).
-+ * No stack, no page tables, no MMU mapping needed. */
-+.macro SWEET_STAGE num, col
-+	MOV64	x0, (0xFC800000 + 2368 * 5088 + (\num) * 128)
-+	MOV64	w1, \col
- 	mov		x2, #32
+-	mov		x2, #32
 -	mov		x4, #4320
 -Lsweet_mark_row:
 -	mov		x3, #64
-+	mov		x4, #5088
-+9:	mov		x3, #48
- 	mov		x5, x0
+-	mov		x5, x0
 -Lsweet_mark_pixel:
 -	str		w1, [x5], #4
-+8:	str		w1, [x5], #4
++	movz	x0, #0xd800
++	movk	x0, #0xfd37, lsl #16
++	movz	w1, #0xffff
++	movk	w1, #0xffff, lsl #16
++	mov	x2, #32
++	mov	x4, #5088
++9:	mov	x3, #48
++	mov	x5, x0
++8:	str	w1, [x5], #4
  	subs	x3, x3, #1
 -	b.ne	Lsweet_mark_pixel
+-	add		x0, x0, x4
 +	b.ne	8b
- 	add		x0, x0, x4
++	add	x0, x0, x4
  	subs	x2, x2, #1
 -	b.ne	Lsweet_mark_row
+-	dsb		sy
 +	b.ne	9b
- 	dsb		sy
-+.endm
-+	SWEET_STAGE 0, 0xFFFFFFFF	/* entered start_first_cpu   (white) */
++	dsb	sy
  #endif
  
  	// Set low reset vector before attempting any loads
-@@ -487,6 +490,9 @@
+@@ -487,6 +486,23 @@
  	add		x0, x0, EXT(LowExceptionVectorBase)@pageoff
  	MSR_VBAR_EL1_X0
  
 +#if defined(SWEET)
-+	SWEET_STAGE 1, 0xFFFF0000	/* VBAR installed            (red)   */
++	movz	x0, #0xd880
++	movk	x0, #0xfd37, lsl #16
++	movz	w1, #0x0000
++	movk	w1, #0xffff, lsl #16
++	mov	x2, #32
++	mov	x4, #5088
++9:	mov	x3, #48
++	mov	x5, x0
++8:	str	w1, [x5], #4
++	subs	x3, x3, #1
++	b.ne	8b
++	add	x0, x0, x4
++	subs	x2, x2, #1
++	b.ne	9b
++	dsb	sy
 +#endif
  
  	// Get the kernel memory parameters from the boot args
  	ldr		x22, [x20, BA_VIRT_BASE]			// Get the kernel virt base
-@@ -643,6 +649,7 @@
+@@ -643,6 +659,21 @@
  	lsr		x12, x12, #(ARM_TT_L2_SHIFT)
  	add		x13, x25, #(2 * PGBYTES)
  	str		x11, [x13, x12, lsl #TTE_SHIFT]
-+	SWEET_STAGE 2, 0xFF00FF00	/* mappings + fb block       (green) */
++	movz	x0, #0xd900
++	movk	x0, #0xfd37, lsl #16
++	movz	w1, #0xff00
++	movk	w1, #0xff00, lsl #16
++	mov	x2, #32
++	mov	x4, #5088
++9:	mov	x3, #48
++	mov	x5, x0
++8:	str	w1, [x5], #4
++	subs	x3, x3, #1
++	b.ne	8b
++	add	x0, x0, x4
++	subs	x2, x2, #1
++	b.ne	9b
++	dsb	sy
  #endif
  
  	/* Ensure TTEs are visible */
-@@ -668,6 +675,9 @@
+@@ -668,6 +699,23 @@
   *	TPIDRRO_EL0 - CPU number
   */
  common_start:
 +#if defined(SWEET)
-+	SWEET_STAGE 3, 0xFF0000FF	/* common_start, MMU on      (blue)  */
++	movz	x0, #0xd980
++	movk	x0, #0xfd37, lsl #16
++	movz	w1, #0x00ff
++	movk	w1, #0xff00, lsl #16
++	mov	x2, #32
++	mov	x4, #5088
++9:	mov	x3, #48
++	mov	x5, x0
++8:	str	w1, [x5], #4
++	subs	x3, x3, #1
++	b.ne	8b
++	add	x0, x0, x4
++	subs	x2, x2, #1
++	b.ne	9b
++	dsb	sy
 +#endif
  
  #if HAS_NEX_PG
