@@ -1,23 +1,25 @@
 diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
 --- a/osfmk/arm64/start.s
 +++ b/osfmk/arm64/start.s
-@@ -464,22 +464,24 @@
+@@ -464,22 +464,25 @@
  	mov		x21, #0
  
  #if defined(SWEET)
 -	/* Stage 0: white 64x32 band, no stack or page tables needed. */
 -	MOV64	x0, (0xFC800000 + 2368 * 4320)
-+/* Bring-up stage markers: one 64x32 white block per stage at row 2368,
-+ * 80 px apart. No stack, no page tables, no MMU mapping needed. */
-+.macro SWEET_STAGE num
-+	MOV64	x0, (0xFC800000 + 2368 * 5088 + (\num) * 80)
- 	mov		w1, #-1
+-	mov		w1, #-1
++/* Bring-up stage markers: one 48x32 block per stage at row 2368, 128 px
++ * apart, distinct colour per stage (0 white, 1 red, 2 green, 3 blue).
++ * No stack, no page tables, no MMU mapping needed. */
++.macro SWEET_STAGE num, col
++	MOV64	x0, (0xFC800000 + 2368 * 5088 + (\num) * 128)
++	MOV64	w1, \col
  	mov		x2, #32
 -	mov		x4, #4320
 -Lsweet_mark_row:
 -	mov		x3, #64
 +	mov		x4, #5088
-+9:	mov		x3, #64
++9:	mov		x3, #48
  	mov		x5, x0
 -Lsweet_mark_pixel:
 -	str		w1, [x5], #4
@@ -31,34 +33,34 @@ diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
 +	b.ne	9b
  	dsb		sy
 +.endm
-+	SWEET_STAGE 0		/* entered start_first_cpu */
++	SWEET_STAGE 0, 0xFFFFFFFF	/* entered start_first_cpu   (white) */
  #endif
  
  	// Set low reset vector before attempting any loads
-@@ -487,6 +489,9 @@
+@@ -487,6 +490,9 @@
  	add		x0, x0, EXT(LowExceptionVectorBase)@pageoff
  	MSR_VBAR_EL1_X0
  
 +#if defined(SWEET)
-+	SWEET_STAGE 1		/* VBAR installed */
++	SWEET_STAGE 1, 0xFFFF0000	/* VBAR installed            (red)   */
 +#endif
  
  	// Get the kernel memory parameters from the boot args
  	ldr		x22, [x20, BA_VIRT_BASE]			// Get the kernel virt base
-@@ -643,6 +648,7 @@
+@@ -643,6 +649,7 @@
  	lsr		x12, x12, #(ARM_TT_L2_SHIFT)
  	add		x13, x25, #(2 * PGBYTES)
  	str		x11, [x13, x12, lsl #TTE_SHIFT]
-+	SWEET_STAGE 2		/* bootstrap mappings + fb block written */
++	SWEET_STAGE 2, 0xFF00FF00	/* mappings + fb block       (green) */
  #endif
  
  	/* Ensure TTEs are visible */
-@@ -668,6 +674,9 @@
+@@ -668,6 +675,9 @@
   *	TPIDRRO_EL0 - CPU number
   */
  common_start:
 +#if defined(SWEET)
-+	SWEET_STAGE 3		/* reached common_start (MMU on) */
++	SWEET_STAGE 3, 0xFF0000FF	/* common_start, MMU on      (blue)  */
 +#endif
  
  #if HAS_NEX_PG
