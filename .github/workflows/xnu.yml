@@ -116,6 +116,20 @@ jobs:
           ls -la out
           (cd out && shasum -a 256 kernel.* > SHA256SUMS) || true
 
+      - name: Pack kernel only (small artifact)
+        if: always()
+        run: |
+          mkdir -p out-small
+          cp out/kernel.* out-small/ 2>/dev/null || true
+          gzip -9 -f out-small/kernel.* 2>/dev/null || true
+          ls -la out-small
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kernel-gz
+          path: out-small/
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
