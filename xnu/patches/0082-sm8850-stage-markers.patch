@@ -107,29 +107,12 @@ diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
  
  #if HAS_NEX_PG
  	mov x19, lr
-@@ -679,8 +727,52 @@
+@@ -679,8 +727,35 @@
  	adrp	x0,     EXT(sysreg_restore)@page		// Load TCR value from the system register restore structure
  	add		x0, x0, EXT(sysreg_restore)@pageoff
  	ldr		x1, [x0, SR_RESTORE_TCR_EL1]
 +
 +#if defined(SWEET)
-+	/* stage 9: TCR value loaded (olive) */
-+	movz	x0, #0xdc80
-+	movk	x0, #0xfd37, lsl #16
-+	movz	w1, #0x8000
-+	movk	w1, #0xff00, lsl #16
-+	mov	x2, #32
-+	mov	x4, #5088
-+3:	mov	x3, #48
-+	mov	x5, x0
-+2:	str	w1, [x5], #4
-+	subs	x3, x3, #1
-+	b.ne	2b
-+	add	x0, x0, x4
-+	subs	x2, x2, #1
-+	b.ne	3b
-+	dsb	sy
-+
 +	/* The 16K bootstrap tables require TG0=16KB; the built-in initializer
 +	 * carries TG0=64KB, which the walk cannot use. Force bits [15:14]=01. */
 +	movz	x9, #0x8000
@@ -160,7 +143,7 @@ diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
  	/* Set up translation table base registers.
  	 *	TTBR0 - V=P table @ top of kernel
  	 *	TTBR1 - KVA table @ top of kernel + 1 page
-@@ -698,6 +790,25 @@
+@@ -698,6 +773,25 @@
  	and		x0, x0, #(TTBR_BADDR_MASK)
  	MSR_TTBR1_EL1_X0
  
@@ -186,7 +169,7 @@ diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
  	// Set up MAIR attr0 for normal memory, attr1 for device memory
  	mov		x0, xzr
  	mov		x1, #(MAIR_WRITEBACK << MAIR_ATTR_SHIFT(CACHE_ATTRINDX_WRITEBACK))
-@@ -721,6 +832,25 @@
+@@ -721,6 +815,25 @@
  	tlbi	vmalle1
  	dsb		ish
  
@@ -212,7 +195,7 @@ diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
  
  #if defined(BCM2837)
  	// Setup timer interrupt routing; must be done before MMU is enabled
-@@ -781,6 +911,25 @@
+@@ -781,6 +894,25 @@
  	MSR_SCTLR_EL1_X0
  	isb		sy
  
@@ -238,7 +221,7 @@ diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
  #if !VMAPPLE && !defined(SWEET)
  	MOV64   x1, SCTLR_EL1_DEFAULT
  	cmp		x0, x1
-@@ -826,6 +975,25 @@
+@@ -826,6 +958,25 @@
  	// If x21 != 0, we're doing a warm reset, so we need to trampoline to the kernel pmap.
  	cbnz	x21, Ltrampoline
  
